@@ -1,0 +1,14 @@
+# Device-only files (never commit these)
+config.json
+ugit.py
+ugit.backup
+ugit_log.txt
+
+# Python bytecode
+__pycache__/
+*.mpy
+
+# IDE / tools
+.vscode/
+.thonny/
+.claude/
