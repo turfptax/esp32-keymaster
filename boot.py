@@ -1,5 +1,9 @@
 # boot.py -- runs once at power-on before main.py
 #
+# IMPORTANT: ESP32-S3 uses native USB-CDC. The time.sleep(2) below lets
+# USB enumerate before anything can crash. Without it, a boot crash makes
+# the device invisible (no COM port) and requires a full reflash.
+#
 # First-Time Setup Instructions:
 #   1. pip install esptool mpremote
 #   2. Download MicroPython ESP32-S3 SPIRAM_OCT firmware from:
@@ -13,15 +17,21 @@
 #   7. Configure ugit (run once in REPL):
 #      import ugit
 #      ugit.create_config(ssid='WiFiName', password='WiFiPass',
-#                         user='turfptax', repository='esp32-keymaster')
+#                         user='turfptax', repository='esp32-keymaster',
+#                         ignore=['/lib', '/ble_secrets.json'])
 #   8. After ugit is configured, the device auto-updates from GitHub on boot.
-import gc
-import esp
-esp.osdebug(None)
-gc.collect()
-print("boot.py: system ready")
-# OTA update check -- sync with GitHub repo before starting app
+
+import time
+time.sleep(2)  # Let USB-CDC enumerate -- prevents bricking on crash
+
 try:
+    import gc
+    import esp
+    esp.osdebug(None)
+    gc.collect()
+    print("boot.py: system ready")
+
+    # OTA update check -- sync with GitHub repo before starting app
     import ugit
     print("boot.py: checking for updates...")
     ugit.wificonnect()
@@ -32,5 +42,5 @@ try:
 except ImportError:
     print("boot.py: ugit not installed, skipping update check")
 except Exception as e:
-    print("boot.py: update check failed:", e)
+    print("boot.py: error:", e)
     # Continue anyway -- run with existing code on flash
