@@ -5,18 +5,6 @@ import aioble
 from bluetooth import UUID
 
 
-# Configure BLE bonding so Android pairing requests succeed.
-# Without this, aioble defaults to "no bonding" and Android drops
-# the connection after the pairing dialog.
-_ble = bluetooth.BLE()
-try:
-    _ble.config(bond=True)
-    _ble.config(mitm=False)
-    _ble.config(io=3)  # 3 = NoInputNoOutput (just works pairing)
-    print("BLE: bonding configured")
-except Exception as e:
-    print("BLE: bonding config not supported:", e)
-
 # Custom UUIDs for the KeyMaster service
 _SERVICE_UUID = UUID("a0e1b2c3-d4e5-f6a7-b8c9-0a1b2c3d4e50")
 _TX_UUID = UUID("a0e1b2c3-d4e5-f6a7-b8c9-0a1b2c3d4e51")  # ESP32 -> Phone
@@ -31,6 +19,16 @@ class BLEServer:
         self._on_receive = on_receive
         self._on_status = on_status
         self._connection = None
+
+        # Configure BLE bonding so Android pairing requests succeed.
+        try:
+            ble = bluetooth.BLE()
+            ble.config(bond=True)
+            ble.config(mitm=False)
+            ble.config(io=3)  # 3 = NoInputNoOutput (just works pairing)
+            print("BLE: bonding configured")
+        except Exception as e:
+            print("BLE: bonding config not supported:", e)
 
         # Register GATT service and characteristics
         service = aioble.Service(_SERVICE_UUID)

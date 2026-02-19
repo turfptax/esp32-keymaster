@@ -24,11 +24,21 @@ gc.collect()
 
 print("boot.py: system ready")
 
+# Ensure BLE radio is off so WiFi can use the shared 2.4GHz radio
+try:
+    import bluetooth
+    bluetooth.BLE().active(False)
+    print("boot.py: BLE radio off for WiFi")
+except:
+    pass
+
 # OTA update check -- sync with GitHub repo before starting app
 try:
     import ugit
+    print("boot.py: connecting WiFi...")
+    ugit.wificonnect()
     print("boot.py: checking for updates...")
-    ugit.pull_all()
+    ugit.pull_all(isconnected=True)
     # If files changed, ugit calls machine.reset() and we never reach here.
     # If no changes, we continue to main.py normally.
     print("boot.py: up to date")

@@ -1,5 +1,6 @@
 # Device-only files (never commit these)
 config.json
+ble_secrets.json
 ugit.py
 ugit.backup
 ugit_log.txt

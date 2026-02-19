@@ -54,9 +54,12 @@ ugit.create_config(
     ssid='YourWiFiSSID',
     password='YourWiFiPassword',
     user='turfptax',
-    repository='esp32-keymaster'
+    repository='esp32-keymaster',
+    ignore=['/lib', '/ble_secrets.json']
 )
 ```
+
+The `ignore` list protects device-only files from being deleted during sync.
 
 After this, the device auto-syncs with this repo on every boot.
 
