@@ -29,6 +29,22 @@ class ButtonManager:
         """True when the button is currently held down (active LOW)."""
         return self._pin.value() == 0
 
+    @property
+    def on_press(self):
+        return self._on_press
+
+    @on_press.setter
+    def on_press(self, callback):
+        self._on_press = callback
+
+    @property
+    def on_long_press(self):
+        return self._on_long_press
+
+    @on_long_press.setter
+    def on_long_press(self, callback):
+        self._on_long_press = callback
+
     async def monitor(self):
         """Run forever, detecting button presses.
 

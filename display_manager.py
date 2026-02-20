@@ -80,7 +80,13 @@ class DisplayManager:
             color_order=st7789.BGR,
         )
         self._log_buf = []
+        self.menu_active = False
         gc.collect()
+
+    @property
+    def tft(self):
+        """Expose ST7789 instance for direct rendering (used by menu_ui)."""
+        return self._tft
 
     # --- Public API ---
 
@@ -94,11 +100,15 @@ class DisplayManager:
 
     def show_advertising(self):
         """Update status zone to show advertising state."""
+        if self.menu_active:
+            return
         self._draw_status("Advertising...", _ADV_COLOR)
         self.log("Advertising...")
 
     def show_connected(self, device_info=""):
         """Update status zone to show connected state."""
+        if self.menu_active:
+            return
         self._draw_status("Connected", _CONN_COLOR)
         msg = "Connected"
         if device_info:
@@ -107,17 +117,35 @@ class DisplayManager:
 
     def show_disconnected(self):
         """Update status zone to show disconnected state."""
+        if self.menu_active:
+            return
         self._draw_status("Disconnected", _DISC_COLOR)
         self.log("Disconnected")
 
     def log(self, message):
-        """Add a message to the scrolling event log."""
+        """Add a message to the scrolling event log.
+        Always buffers; skips rendering when menu is active."""
         max_msg = _CHARS_PER_LINE - 2  # Room for "> " prefix
         if len(message) > max_msg:
             message = message[:max_msg]
         self._log_buf.append(message)
         if len(self._log_buf) > _MAX_LOG_LINES:
             self._log_buf.pop(0)
+        if not self.menu_active:
+            self._draw_log()
+
+    def restore_status_screen(self, state="advertising"):
+        """Redraw the full status screen after exiting menu mode."""
+        self._tft.fill(_BG)
+        self._draw_title()
+        self._draw_separator(_SEP1_Y)
+        if state == "connected":
+            self._draw_status("Connected", _CONN_COLOR)
+        elif state == "disconnected":
+            self._draw_status("Disconnected", _DISC_COLOR)
+        else:
+            self._draw_status("Advertising...", _ADV_COLOR)
+        self._draw_separator(_SEP2_Y)
         self._draw_log()
 
     # --- Internal rendering ---
