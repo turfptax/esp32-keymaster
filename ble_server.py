@@ -123,6 +123,7 @@ class BLEServer:
             gc.collect()
 
     async def _rx_task(self):
+        rx_buf = bytearray()
         while True:
             try:
                 connection, data = await self._rx_char.written(timeout_ms=1000)
@@ -130,16 +131,27 @@ class BLEServer:
                 await asyncio.sleep_ms(50)
                 continue
             except aioble.DeviceDisconnectedError:
+                rx_buf = bytearray()
                 await asyncio.sleep_ms(100)
                 continue
 
-            try:
-                message = data.decode("utf-8")
-            except UnicodeError:
-                message = str(data)
+            rx_buf.extend(data)
 
-            print("BLE RX:", message)
-            self._notify_status("rx", message)
+            # Process complete newline-delimited messages
+            while b"\n" in rx_buf:
+                idx = rx_buf.index(b"\n")
+                try:
+                    message = bytes(rx_buf[:idx]).decode("utf-8")
+                except UnicodeError:
+                    message = str(bytes(rx_buf[:idx]))
+                rx_buf = rx_buf[idx + 1:]
 
-            if self._on_receive:
-                self._on_receive(self, message, connection)
+                print("BLE RX:", message)
+                self._notify_status("rx", message)
+
+                if self._on_receive:
+                    self._on_receive(self, message, connection)
+
+            # Safety: discard buffer if too large without newline
+            if len(rx_buf) > 4096:
+                rx_buf = bytearray()
