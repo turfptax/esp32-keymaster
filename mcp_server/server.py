@@ -96,8 +96,15 @@ class _SerialBridge:
         self._ensure_connected()
         if not message.endswith("\n"):
             message += "\n"
-        with self._lock:
-            self._ser.write(message.encode("utf-8"))
+        encoded = message.encode("utf-8")
+        try:
+            with self._lock:
+                self._ser.write(encoded)
+        except (serial.SerialException, PermissionError, OSError):
+            # Stale handle after device reboot — reconnect and retry
+            self._reconnect()
+            with self._lock:
+                self._ser.write(encoded)
 
     def send_and_wait(self, message, timeout=None, settle=0.4):
         """Send a message and collect response lines.
@@ -159,6 +166,18 @@ class _SerialBridge:
 
     # -- internals --
 
+    def _reconnect(self):
+        """Close stale connection and reopen."""
+        port = self.port_name
+        try:
+            if self._ser:
+                self._ser.close()
+        except Exception:
+            pass
+        self._ser = None
+        time.sleep(1.0)
+        self.connect(port=port)
+
     def _ensure_connected(self):
         if not self.is_connected:
             self.connect()
@@ -189,9 +208,13 @@ class _SerialBridge:
                                 self._rx_queue.append((time.time(), line))
                 else:
                     time.sleep(0.2)
-            except serial.SerialException:
-                # Port disconnected
-                time.sleep(1.0)
+            except (serial.SerialException, PermissionError, OSError):
+                # Port disconnected or device rebooted — try to reconnect
+                buf = b""
+                try:
+                    self._reconnect()
+                except Exception:
+                    time.sleep(2.0)
             except Exception:
                 time.sleep(0.5)
 

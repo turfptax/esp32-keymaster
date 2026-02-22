@@ -23,10 +23,11 @@ class BLEServer:
         # Configure BLE bonding so Android pairing requests succeed.
         try:
             ble = bluetooth.BLE()
+            ble.config(mtu=512)
             ble.config(bond=True)
             ble.config(mitm=False)
             ble.config(io=3)  # 3 = NoInputNoOutput (just works pairing)
-            print("BLE: bonding configured")
+            print("BLE: MTU=512, bonding configured")
         except Exception as e:
             print("BLE: bonding config not supported:", e)
 
