@@ -37,8 +37,10 @@ class BLEServer:
         self._tx_char = aioble.Characteristic(
             service, _TX_UUID, read=True, notify=True,
         )
-        self._rx_char = aioble.Characteristic(
-            service, _RX_UUID, write=True, capture=True,
+        # BufferedCharacteristic with max_len=512 so BLE writes up to
+        # MTU-3 (509 bytes) aren't truncated to the default 20 bytes.
+        self._rx_char = aioble.BufferedCharacteristic(
+            service, _RX_UUID, write=True, capture=True, max_len=512,
         )
         aioble.register_services(service)
 
