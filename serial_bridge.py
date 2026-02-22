@@ -47,6 +47,15 @@ class SerialBridge:
     async def run(self):
         """USB Serial -> BLE TX async loop. Add to asyncio.gather()."""
         print("Bridge: serial reader started")
+        # Flush any boot output that accumulated in stdin
+        await asyncio.sleep_ms(500)
+        while self._poll.poll(0):
+            try:
+                sys.stdin.read(1)
+            except Exception:
+                break
+        self._buf = bytearray()
+        print("Bridge: stdin flushed, ready")
         while True:
             events = self._poll.poll(_POLL_TIMEOUT_MS)
             if events:
