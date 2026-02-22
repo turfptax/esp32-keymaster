@@ -20,16 +20,17 @@ class BLEServer:
         self._on_status = on_status
         self._connection = None
 
-        # Configure BLE bonding so Android pairing requests succeed.
+        # Configure BLE — must activate before setting MTU
         try:
             ble = bluetooth.BLE()
+            ble.active(True)
             ble.config(mtu=512)
             ble.config(bond=True)
             ble.config(mitm=False)
             ble.config(io=3)  # 3 = NoInputNoOutput (just works pairing)
-            print("BLE: MTU=512, bonding configured")
+            print("BLE: active, MTU=512, bonding configured")
         except Exception as e:
-            print("BLE: bonding config not supported:", e)
+            print("BLE: config error:", e)
 
         # Register GATT service and characteristics
         service = aioble.Service(_SERVICE_UUID)
@@ -88,6 +89,14 @@ class BLEServer:
                 )
                 self._connection = connection
                 print("BLE: connected to", connection.device)
+
+                # Negotiate larger MTU for Cortex protocol messages
+                try:
+                    await connection.exchange_mtu(512)
+                    print("BLE: MTU exchanged")
+                except Exception as e:
+                    print("BLE: MTU exchange skipped:", e)
+
                 self._notify_status("connected", str(connection.device))
 
                 # Poll for disconnection -- more reliable than
