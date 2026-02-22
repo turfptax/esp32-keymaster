@@ -83,7 +83,7 @@ class SerialBridge:
         while b"\n" in self._buf:
             idx = self._buf.index(b"\n")
             line_bytes = bytes(self._buf[:idx + 1])  # Include \n
-            del self._buf[:idx + 1]
+            self._buf = self._buf[idx + 1:]
 
             if len(line_bytes) > _MAX_MSG:
                 line_bytes = line_bytes[:_MAX_MSG - 1] + b"\n"
