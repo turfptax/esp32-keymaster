@@ -54,11 +54,18 @@ class BLEServer:
                 print("BLE: status callback error:", e)
 
     def send(self, data):
-        """Send a string to the connected phone via TX notification."""
+        """Send a string to the connected device via TX notification."""
         if not self.connected:
             print("BLE: not connected, cannot send")
             return
         self._tx_char.write(data.encode("utf-8"), send_update=True)
+
+    def send_raw(self, data_bytes):
+        """Send raw bytes via TX notification (no encoding).
+        Used by SerialBridge for pre-encoded / chunked data."""
+        if not self.connected:
+            return
+        self._tx_char.write(data_bytes, send_update=True)
 
     async def run(self):
         """Start the BLE server. Runs forever (advertise + receive loop)."""

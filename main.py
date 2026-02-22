@@ -95,8 +95,9 @@ try:
 except Exception as e:
     print("main.py: button init FAILED:", e)
 
-# BLE server reference (set in main(), used by menu callbacks)
+# BLE server and bridge references (set in main(), used by callbacks)
 server = None
+bridge = None
 
 
 # ---------------------------------------------------------------
@@ -128,6 +129,7 @@ def _build_device_info():
     from menu_ui import MenuItem
     items = [
         MenuItem("BLE", "info", _get_ble_info),
+        MenuItem("Bridge", "info", _get_bridge_info),
         MenuItem("SD Card", "info", _get_sd_info),
         MenuItem("Uptime", "info", _get_uptime),
         MenuItem("Free RAM", "info", _get_free_ram),
@@ -140,6 +142,14 @@ def _get_ble_info():
     if server and hasattr(server, '_connection') and server._connection:
         return "Connected"
     return "Advertising"
+
+
+def _get_bridge_info():
+    if bridge and server and server.connected:
+        return "Active"
+    elif bridge:
+        return "Idle"
+    return "Off"
 
 
 def _get_sd_info():
@@ -321,7 +331,7 @@ def _show_about():
         display.restore_status_screen(
             "connected" if _is_ble_connected() else "advertising"
         )
-        display.log("KeyMaster v0.2.0")
+        display.log("KeyMaster v0.3.0")
         display.log("ESP32-S3-LCD-1.47")
         display.log("github.com/")
         display.log("  turfptax/")
@@ -409,17 +419,19 @@ def _restore_button_callbacks():
 
 
 # ---------------------------------------------------------------
-# BLE callbacks
+# BLE / Bridge callbacks
 # ---------------------------------------------------------------
 
-def on_receive(srv, message, connection):
-    """Called when the phone sends data. Echoes it back for testing."""
-    print("Received from phone:", message)
-    _log("RX: " + message)
-    if led:
-        led.status_rx()
-    srv.send("Echo: " + message)
-    _log("TX: Echo: " + message)
+def on_bridge_activity(direction, message):
+    """Called by SerialBridge on data flow. Updates display and LED."""
+    if direction == "serial_in":
+        _log("S>B: " + message[:16])
+        if led:
+            led.set_color(0, 200, 200)  # Teal for serial->BLE
+    elif direction == "ble_in":
+        _log("B>S: " + message[:16])
+        if led:
+            led.status_rx()
 
 
 def on_status(event, detail=""):
@@ -450,20 +462,20 @@ def on_status(event, detail=""):
 # ---------------------------------------------------------------
 
 async def main():
-    global server
+    global server, bridge
 
     print("=" * 40)
-    print("  KeyMaster BLE Server v0.2.0")
+    print("  KeyMaster BLE Bridge v0.3.0")
     print("=" * 40)
     print()
     print("Controls:")
     print("  Short press BOOT = device info")
     print("  Long press BOOT  = open menu")
     print()
-    print("BLE test:")
-    print("  1. nRF Connect -> scan -> 'KeyMaster'")
-    print("  2. Subscribe TX (..4e51)")
-    print("  3. Write to RX (..4e52)")
+    print("Bridge mode:")
+    print("  USB Serial <-> BLE transparent pipe")
+    print("  Newline-delimited, max 512 bytes/msg")
+    print("  Send CMD:ping to test round trip")
     print()
     if sd and sd.is_mounted:
         print("  SD card: mounted at", sd.mount_point)
@@ -482,15 +494,25 @@ async def main():
 
     _log("Starting BLE...")
 
+    # Create BLE server (on_receive wired to bridge below)
     server = BLEServer(
         device_name="KeyMaster",
-        on_receive=on_receive,
+        on_receive=None,
         on_status=on_status,
     )
-    _log("BLE server created")
 
-    # Gather all async tasks -- BLE server + button monitor
-    tasks = [server.run()]
+    # Create serial bridge and wire as BLE receive handler
+    from serial_bridge import SerialBridge
+    bridge = SerialBridge(
+        ble_server=server,
+        on_activity=on_bridge_activity,
+    )
+    server._on_receive = bridge.on_ble_receive
+
+    _log("BLE + Bridge ready")
+
+    # Gather all async tasks
+    tasks = [server.run(), bridge.run()]
     if button:
         tasks.append(button.monitor())
 
