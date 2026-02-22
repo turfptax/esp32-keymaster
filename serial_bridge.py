@@ -19,7 +19,6 @@ import time
 
 _CHUNK_SIZE = 200        # Safe BLE notification MTU chunk size
 _CHUNK_PAYLOAD = _CHUNK_SIZE - 1  # Messages > this use CHUNK:n/N: protocol
-_POLL_TIMEOUT_MS = 10    # select.poll() timeout (low to avoid blocking BLE rx)
 _BUF_OVERFLOW = 4096     # Clear buffer if this big without \n
 _CHUNK_TIMEOUT_MS = 15000 # Discard incomplete chunk sequences after 15s
 
@@ -119,13 +118,15 @@ class SerialBridge:
         self._buf = bytearray()
         print("Bridge: stdin flushed, ready")
         while True:
-            events = self._poll.poll(_POLL_TIMEOUT_MS)
+            # Non-blocking poll — poll(timeout) blocks the event loop
+            # and starves BLE rx_task on ESP32 USB-CDC
+            events = self._poll.poll(0)
             if events:
                 self._read_available()
             self._process_buffer()
             # Check for stale inbound chunks
             self._check_chunk_timeout()
-            await asyncio.sleep_ms(0)  # Yield to event loop
+            await asyncio.sleep_ms(1)  # Yield to event loop
 
     def _read_available(self):
         """Read all available bytes from stdin into the buffer."""
