@@ -1,6 +1,6 @@
-# ESP32 KeyMaster
+# ESP32 KeyMaster (Cortex Link)
 
-BLE server for the Waveshare ESP32-S3-LCD-1.47 development board. Provides a secure Bluetooth Low Energy interface for sharing API keys and sensitive data between devices. Includes a 172x320 ST7789 display for real-time status monitoring and OTA updates via WiFi using [ugit](https://github.com/turfptax/ugit).
+BLE server and USB-serial bridge for the Waveshare ESP32-S3-LCD-1.47 development board. Serves as **Cortex Link** — a transparent USB-to-BLE bridge for the [Cortex](https://github.com/turfptax/cortex) wearable AI memory system. Includes a 172x320 ST7789 display for real-time status monitoring and OTA updates via WiFi using [ugit](https://github.com/turfptax/ugit).
 
 ## Hardware
 
@@ -139,7 +139,27 @@ Press the RESET button. The device will:
 | `sdcard.py` | SD card SPI driver (from micropython-lib) |
 | `sd_manager.py` | SD card mount/unmount and file operations |
 | `led_manager.py` | NeoPixel RGB LED controller |
+| `serial_bridge.py` | USB serial ↔ BLE bridge with chunking protocol |
+| `menu_ui.py` | Interactive menu system (single button navigation) |
+| `key_store.py` | Encrypted key storage on SD card |
 | `button.py` | BOOT button async handler with debounce |
+
+## Cortex System Integration
+
+When used as **Cortex Link**, this ESP32 acts as a transparent bidirectional bridge:
+
+```
+Computer ──USB Serial──> ESP32 (this firmware) ──BLE──> Pi Zero 2 W (Cortex Core)
+```
+
+- All USB serial lines are forwarded over BLE to the Pi, and vice versa
+- Messages > 199 bytes are automatically chunked using the `CHUNK:n/N:data` protocol
+- The ESP32 does not parse or modify message content — it is fully transparent
+- WiFi is the preferred transport (direct HTTP to Pi); BLE via this dongle is the fallback
+
+Related repos:
+- [cortex](https://github.com/turfptax/cortex) — MCP server, CLI, and daemon (runs on PC)
+- [cortex-core](https://github.com/turfptax/cortex-core) — Pi Zero service, database, HTTP API
 
 ## License
 
