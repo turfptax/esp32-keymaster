@@ -159,6 +159,17 @@ class SerialBridge:
             line_bytes = bytes(self._buf[:idx])  # Exclude \n for chunking check
             self._buf = self._buf[idx + 1:]
 
+            # TOOL: messages are icon notifications from the MCP server
+            # when using WiFi transport. Display only, don't forward to BLE.
+            if line_bytes.startswith(b"TOOL:"):
+                if self._on_activity:
+                    try:
+                        cmd = line_bytes[5:].decode("utf-8", "replace").strip()
+                        self._on_activity("tool_notify", cmd)
+                    except Exception:
+                        pass
+                continue
+
             if len(line_bytes) > _CHUNK_PAYLOAD:
                 self._send_chunked(line_bytes)
             else:

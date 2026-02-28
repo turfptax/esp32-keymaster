@@ -453,6 +453,13 @@ def on_bridge_activity(direction, message):
             cmd = _parse_cmd_name(message)
             if cmd:
                 display.tool_triggered(cmd)
+    elif direction == "tool_notify":
+        # Icon notification from MCP server (WiFi transport mode).
+        # message is the raw command name (e.g. "note", "ping").
+        if display:
+            display.tool_triggered(message)
+        if led:
+            led.set_color(0, 200, 200)
     elif direction == "ble_in":
         _log("B>S: " + message[:16])
         if led:
