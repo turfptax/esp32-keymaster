@@ -6,6 +6,7 @@ Provides async monitoring with debounce and short/long press detection.
 """
 
 import asyncio
+import time
 from machine import Pin
 
 
@@ -64,41 +65,36 @@ class ButtonManager:
         """
         print("Button: monitor started")
         while True:
-            # Wait for button press (active LOW)
-            if self._pin.value() == 0:
-                # Debounce -- wait and re-check
-                await asyncio.sleep_ms(self._debounce_ms)
-                if self._pin.value() != 0:
-                    # False trigger
-                    continue
+            try:
+                # Wait for button press (active LOW)
+                if self._pin.value() == 0:
+                    # Debounce -- wait and re-check
+                    await asyncio.sleep_ms(self._debounce_ms)
+                    if self._pin.value() != 0:
+                        # False trigger
+                        continue
 
-                # Button is genuinely pressed -- time the hold
-                press_start = asyncio.ticks_ms()
+                    # Button is genuinely pressed -- time the hold
+                    press_start = time.ticks_ms()
 
-                # Wait for release
-                while self._pin.value() == 0:
-                    await asyncio.sleep_ms(20)
+                    # Wait for release
+                    while self._pin.value() == 0:
+                        await asyncio.sleep_ms(20)
 
-                duration = asyncio.ticks_diff(asyncio.ticks_ms(), press_start)
-                print("Button: press {}ms".format(duration))
+                    duration = time.ticks_diff(time.ticks_ms(), press_start)
+                    print("Button: press {}ms".format(duration))
 
-                if duration >= self._very_long_press_ms:
-                    if self._on_very_long_press:
-                        try:
+                    if duration >= self._very_long_press_ms:
+                        if self._on_very_long_press:
                             self._on_very_long_press(duration)
-                        except Exception as e:
-                            print("Button: very_long_press callback error:", e)
-                elif duration >= self._long_press_ms:
-                    if self._on_long_press:
-                        try:
+                    elif duration >= self._long_press_ms:
+                        if self._on_long_press:
                             self._on_long_press(duration)
-                        except Exception as e:
-                            print("Button: long_press callback error:", e)
-                else:
-                    if self._on_press:
-                        try:
+                    else:
+                        if self._on_press:
                             self._on_press(duration)
-                        except Exception as e:
-                            print("Button: press callback error:", e)
+
+            except Exception as e:
+                print("Button: monitor error:", e)
 
             await asyncio.sleep_ms(50)
