@@ -189,8 +189,8 @@ class DisplayManager:
     def _draw_title(self):
         """Render the title zone (dark blue background, white text)."""
         self._tft.fill_rect(0, 0, _WIDTH, _TITLE_H, _TITLE_BG)
-        self._center_text("KeyMaster", 0, _TITLE_FG, _TITLE_BG)
-        self._center_text("BLE Server", _CHAR_H, _TITLE_FG, _TITLE_BG)
+        self._center_text("Cortex-Link", 0, _TITLE_FG, _TITLE_BG)
+        self._center_text("BLE Bridge", _CHAR_H, _TITLE_FG, _TITLE_BG)
 
     def _draw_separator(self, y):
         """Draw a 1px horizontal separator line."""

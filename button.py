@@ -10,18 +10,22 @@ from machine import Pin
 
 
 class ButtonManager:
-    def __init__(self, pin=0, on_press=None, on_long_press=None):
+    def __init__(self, pin=0, on_press=None, on_long_press=None,
+                 on_very_long_press=None):
         """
         Args:
             pin: GPIO number (default 0 = BOOT button).
             on_press: callback(duration_ms) for short presses (<1 s).
-            on_long_press: callback(duration_ms) for long presses (>=1 s).
+            on_long_press: callback(duration_ms) for long presses (1-3 s).
+            on_very_long_press: callback(duration_ms) for very long presses (>=3 s).
         """
         self._pin = Pin(pin, Pin.IN, Pin.PULL_UP)
         self._on_press = on_press
         self._on_long_press = on_long_press
+        self._on_very_long_press = on_very_long_press
         self._debounce_ms = 50
         self._long_press_ms = 1000
+        self._very_long_press_ms = 3000
         print("Button: initialized on GPIO", pin)
 
     @property
@@ -44,6 +48,14 @@ class ButtonManager:
     @on_long_press.setter
     def on_long_press(self, callback):
         self._on_long_press = callback
+
+    @property
+    def on_very_long_press(self):
+        return self._on_very_long_press
+
+    @on_very_long_press.setter
+    def on_very_long_press(self, callback):
+        self._on_very_long_press = callback
 
     async def monitor(self):
         """Run forever, detecting button presses.
@@ -70,7 +82,13 @@ class ButtonManager:
                 duration = asyncio.ticks_diff(asyncio.ticks_ms(), press_start)
                 print("Button: press {}ms".format(duration))
 
-                if duration >= self._long_press_ms:
+                if duration >= self._very_long_press_ms:
+                    if self._on_very_long_press:
+                        try:
+                            self._on_very_long_press(duration)
+                        except Exception as e:
+                            print("Button: very_long_press callback error:", e)
+                elif duration >= self._long_press_ms:
                     if self._on_long_press:
                         try:
                             self._on_long_press(duration)

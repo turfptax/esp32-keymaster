@@ -89,6 +89,7 @@ try:
         pin=0,
         on_press=lambda dur: _on_button_press(dur),
         on_long_press=lambda dur: _on_button_long_press(dur),
+        on_very_long_press=lambda dur: _on_button_very_long_press(dur),
     )
     gc.collect()
     print("main.py: button initialized OK")
@@ -331,7 +332,7 @@ def _show_about():
         display.restore_status_screen(
             "connected" if _is_ble_connected() else "advertising"
         )
-        display.log("KeyMaster v0.3.0")
+        display.log("Cortex-Link v0.3.0")
         display.log("ESP32-S3-LCD-1.47")
         display.log("github.com/")
         display.log("  turfptax/")
@@ -369,6 +370,33 @@ def _on_button_long_press(duration_ms):
         _log("Menu not available")
 
 
+def _on_button_very_long_press(duration_ms):
+    """Very long press (3s+) -- trigger OTA update via ugit."""
+    print("Button very long press: {}ms -- OTA update".format(duration_ms))
+    # Close menu if active
+    if menu and menu.is_active:
+        menu.close()
+        _restore_button_callbacks()
+    if display:
+        display.restore_status_screen("advertising")
+        display.log("OTA: hold detected")
+        display.log("OTA: connecting WiFi...")
+    try:
+        import ugit
+        ugit.wificonnect()
+        if display:
+            display.log("OTA: pulling...")
+        ugit.pull_all()
+        if display:
+            display.log("OTA: done! Resetting...")
+        import machine
+        machine.reset()
+    except ImportError:
+        _log("OTA: ugit not found")
+    except Exception as e:
+        _log("OTA fail: " + str(e)[:16])
+
+
 def _enter_menu():
     """Switch from STATUS mode to MENU mode."""
     global _orig_on_press, _orig_on_long_press
@@ -382,7 +410,7 @@ def _enter_menu():
     button.on_long_press = lambda d: _menu_long_press(d)
     # Build and open the root menu
     items = _build_main_menu()
-    menu.open("KeyMaster", items)
+    menu.open("Cortex-Link", items)
 
 
 def _menu_short_press(duration_ms):
@@ -508,7 +536,7 @@ async def main():
     global server, bridge
 
     print("=" * 44)
-    print("  Cortex Link  |  BLE Bridge  |  v0.3.0")
+    print("  Cortex-Link  |  BLE Bridge  |  v0.3.0")
     print("=" * 44)
     print()
     print("This is a Cortex wearable AI memory dongle.")
@@ -528,8 +556,9 @@ async def main():
     print()
     print("-- Hardware Controls --")
     print()
-    print("  Short press BOOT = device info")
-    print("  Long press BOOT  = open menu")
+    print("  Short press BOOT  = device info")
+    print("  Long press BOOT   = open menu")
+    print("  Hold BOOT 3s+     = OTA update")
     print()
     print("-- Status --")
     print()
