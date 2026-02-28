@@ -1,6 +1,14 @@
 """
 display_manager.py - BLE status display for Waveshare ESP32-S3-LCD-1.47
 172x320 ST7789 SPI display in portrait mode.
+
+Layout (top to bottom):
+  Title bar    (0-31)     2 lines centered text
+  Separator    (32)
+  Status zone  (48-79)    "Status: Connected" etc.
+  Separator    (80)
+  Event log    (96-223)   8 scrolling lines
+  Icon panel   (224-319)  6 tool activity icons in 3x2 grid
 """
 
 import gc
@@ -42,7 +50,8 @@ _SEP1_Y         = _TITLE_H                            # 32
 _STATUS_Y       = _SEP1_Y + _CHAR_H                   # 48
 _SEP2_Y         = _STATUS_Y + 2 * _CHAR_H             # 80
 _LOG_Y          = _SEP2_Y + _CHAR_H                    # 96
-_MAX_LOG_LINES  = (_HEIGHT - _LOG_Y) // _CHAR_H       # 14
+_ICON_PANEL_Y   = 224                                  # Icon panel starts here
+_MAX_LOG_LINES  = (_ICON_PANEL_Y - _LOG_Y) // _CHAR_H # 8
 
 # --- Colors (RGB565) ---
 _TITLE_BG  = st7789.color565(0, 0, 80)                # Dark blue
@@ -81,6 +90,12 @@ class DisplayManager:
         )
         self._log_buf = []
         self.menu_active = False
+        self._tool_panel = None
+        try:
+            from tool_icons import ToolPanel
+            self._tool_panel = ToolPanel(font)
+        except Exception as e:
+            print("display: tool_icons load failed:", e)
         gc.collect()
 
     @property
@@ -97,6 +112,8 @@ class DisplayManager:
         self._draw_separator(_SEP1_Y)
         self._draw_status("Initializing...", _ADV_COLOR)
         self._draw_separator(_SEP2_Y)
+        if self._tool_panel:
+            self._tool_panel.draw_all(self._tft)
 
     def show_advertising(self):
         """Update status zone to show advertising state."""
@@ -134,6 +151,23 @@ class DisplayManager:
         if not self.menu_active:
             self._draw_log()
 
+    def tool_triggered(self, cmd_name):
+        """Flash the icon for a Cortex tool command.
+
+        Args:
+            cmd_name: The command name from CMD:<command> protocol
+                      (e.g. "ping", "note", "session_start").
+        """
+        if self._tool_panel and not self.menu_active:
+            group = self._tool_panel.trigger(cmd_name)
+            if group:
+                self._tool_panel.draw_group(self._tft, group)
+
+    def update_icons(self):
+        """Transition icon states (active->recent->dim). Call periodically."""
+        if self._tool_panel and not self.menu_active:
+            self._tool_panel.update(self._tft)
+
     def restore_status_screen(self, state="advertising"):
         """Redraw the full status screen after exiting menu mode."""
         self._tft.fill(_BG)
@@ -147,6 +181,8 @@ class DisplayManager:
             self._draw_status("Advertising...", _ADV_COLOR)
         self._draw_separator(_SEP2_Y)
         self._draw_log()
+        if self._tool_panel:
+            self._tool_panel.draw_all(self._tft)
 
     # --- Internal rendering ---
 
@@ -172,9 +208,9 @@ class DisplayManager:
         self._tft.text(font, text, x_offset, _STATUS_Y, color, _BG)
 
     def _draw_log(self):
-        """Redraw the entire log zone from the ring buffer."""
-        # Clear log zone
-        self._tft.fill_rect(0, _LOG_Y, _WIDTH, _HEIGHT - _LOG_Y, _BG)
+        """Redraw the log zone from the ring buffer (above icon panel)."""
+        # Clear log zone only (between sep2 and icon panel)
+        self._tft.fill_rect(0, _LOG_Y, _WIDTH, _ICON_PANEL_Y - _LOG_Y, _BG)
         # Draw each entry
         for i, msg in enumerate(self._log_buf):
             y = _LOG_Y + i * _CHAR_H

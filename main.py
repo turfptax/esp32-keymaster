@@ -422,12 +422,37 @@ def _restore_button_callbacks():
 # BLE / Bridge callbacks
 # ---------------------------------------------------------------
 
+def _parse_cmd_name(message):
+    """Extract command name from a CMD:<command>:... message."""
+    if message.startswith("CMD:"):
+        rest = message[4:]
+        # CMD:ping or CMD:note:{...}
+        colon = rest.find(":")
+        if colon == -1:
+            return rest.strip()
+        return rest[:colon]
+    # Handle chunked messages: "CHUNK 1/N CMD:command:..."
+    idx = message.find("CMD:")
+    if idx >= 0:
+        rest = message[idx + 4:]
+        colon = rest.find(":")
+        if colon == -1:
+            return rest.strip()
+        return rest[:colon]
+    return None
+
+
 def on_bridge_activity(direction, message):
     """Called by SerialBridge on data flow. Updates display and LED."""
     if direction == "serial_in":
         _log("S>B: " + message[:16])
         if led:
             led.set_color(0, 200, 200)  # Teal for serial->BLE
+        # Detect Cortex tool commands and flash icon
+        if display:
+            cmd = _parse_cmd_name(message)
+            if cmd:
+                display.tool_triggered(cmd)
     elif direction == "ble_in":
         _log("B>S: " + message[:16])
         if led:
@@ -460,6 +485,17 @@ def on_status(event, detail=""):
 # ---------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------
+
+async def _icon_fade_task():
+    """Periodically update icon states (active -> recent -> dim)."""
+    while True:
+        if display and not display.menu_active:
+            try:
+                display.update_icons()
+            except Exception:
+                pass
+        await asyncio.sleep_ms(500)
+
 
 async def main():
     global server, bridge
@@ -532,6 +568,8 @@ async def main():
     tasks = [server.run(), bridge.run()]
     if button:
         tasks.append(button.monitor())
+    if display:
+        tasks.append(_icon_fade_task())
 
     await asyncio.gather(*tasks)
 
